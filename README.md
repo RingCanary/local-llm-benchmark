@@ -127,15 +127,17 @@ The project relies on several key Rust crates:
 
 ### Basic Benchmarking
 
+*please note llama3.2:latest, gemma3, etc, are just the placeholders for the model path, replace it with the actual model path*
+
 ```bash
 # Benchmark a model using Ollama
 cargo run -- benchmark --model-path llama3.2:latest --mode ollama --iterations 3 --warmup 1 --prompt "Write a function to calculate the factorial of a number"
 
 # Benchmark with system metrics collection
-cargo run -- benchmark --model-path opencoder:1.5b --mode ollama --iterations 3 --warmup 1 --system-metrics --prompt "Write a function to calculate the factorial of a number"
+cargo run -- benchmark --model-path opencoder:1.5b --mode ollama --iterations 3 --warmup 1 --system-metrics --prompt "Solve ∫x sin(x) dx from 0 to π with detailed steps"
 
 # Output results in JSON format
-cargo run -- benchmark --model-path llama3.2:latest --mode ollama --iterations 3 --output json --prompt "Write a function to calculate the factorial of a number"
+cargo run -- benchmark --model-path gemma3:latest --mode ollama --iterations 3 --output json --prompt "Describe a red car that is blue."
 
 # Control output verbosity levels
 cargo run -- benchmark --model-path llama3.2:latest --mode ollama --iterations 3 --verbosity 0  # Minimal output
