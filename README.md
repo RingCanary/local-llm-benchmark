@@ -95,8 +95,8 @@ The project relies on several key Rust crates:
 1. **Clone the Repository:**
 
    ```
-   git clone <repo-url>
-   cd <repo-directory>
+   git clone https://github.com/RingCanary/local-llm-benchmark.git
+   cd local-llm-benchmark
    ```
 
 2. **Install Rust:**
