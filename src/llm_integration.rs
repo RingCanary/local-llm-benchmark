@@ -180,6 +180,7 @@ pub struct OllamaOptions {
 
 /// Response structure from Ollama API
 #[derive(Debug, Clone, Deserialize)]
+#[allow(dead_code)]
 pub struct OllamaResponse {
     pub model: String,
     pub created_at: String,
@@ -204,6 +205,7 @@ pub struct OllamaResponse {
 
 /// Ollama model info response
 #[derive(Deserialize, Debug, Clone)]
+#[allow(dead_code)]
 struct OllamaModelInfoResponse {
     model: String,
     modified_at: String,

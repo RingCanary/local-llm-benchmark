@@ -2,7 +2,7 @@
 
 ## Overview
 
-This CLI application is designed to benchmark hardware performance for running local LLM inference tasks. Built in Rust for memory safety and speed, it will measure performance metrics such as latency, token throughput, and system resource usage while running LLM models. The tool is built to interface with local LLM libraries like [llama.c](https://github.com/ggerganov/llama.cpp), [llama.rs](https://github.com/temporalite/llama.rs), and [Ollama](https://ollama.ai/), using an abstraction layer to support all options.
+This CLI application is designed to benchmark hardware performance for running local LLM inference tasks. Built in Rust for memory safety and speed, it will measure performance metrics such as latency, token throughput, and system resource usage while running LLM models. The tool is built to interface with local LLM libraries like [llama.cpp](https://github.com/ggml-org/llama.cpp), [llama.rs](https://github.com/dustletter/llama-rs), and [Ollama](https://ollama.com/), using an abstraction layer to support all options.
 
 ## Features
 
@@ -38,7 +38,11 @@ This CLI application is designed to benchmark hardware performance for running l
 
 ```
 Project Root
-├── Cargo.toml
+├── Cargo.toml          // Project dependencies and configuration
+├── Cargo.lock          // Locked dependency versions
+├── .gitignore          // Git ignore configuration
+├── README.md           // This documentation file
+├── output.log          // Log file (generated when running the application)
 └── src/
     ├── main.rs             // Entry point: sets up CLI and logging
     ├── cli.rs              // CLI argument parsing (using Clap)
@@ -72,6 +76,19 @@ Project Root
 4. **System Metrics Module (src/metrics.rs):**
    - Collect system-level metrics (CPU, memory, GPU if applicable) via the sysinfo crate.
    - Associate these metrics with benchmarking results for detailed performance analysis.
+
+## Dependencies
+
+The project relies on several key Rust crates:
+
+- **clap**: Command-line argument parsing with support for subcommands and options
+- **sysinfo**: System information and metrics collection
+- **serde/serde_json**: Serialization/deserialization for JSON output
+- **anyhow/thiserror**: Error handling
+- **log/fern**: Logging infrastructure
+- **colored**: Terminal coloring for improved readability
+- **indicatif**: Progress bars for benchmarking
+- **reqwest**: HTTP client for Ollama API integration
 
 ## Getting Started
 
@@ -152,7 +169,7 @@ cargo run -- benchmark --model-path llama3.2:latest --mode ollama --iterations 3
 
 ### Logging
 
-This application writes logs to both the console and a log file named `output.log` located in the project root directory. The logs include timestamped information for debugging and performance analysis.
+This application writes logs to both the console and a log file named `output.log` located in the project root directory. The logs include timestamped information for debugging and performance analysis. The log file is excluded from Git tracking via the `.gitignore` file.
 
 ### Verbosity Levels
 
@@ -178,7 +195,25 @@ The tool supports three verbosity levels for output:
    - Standard deviation for CPU and memory usage
    - Additional model metadata
 
-### Sample Output
+## Development Notes
+
+### System Compatibility
+
+The application uses the `sysinfo` crate (v0.33.1+) for system metrics collection, which supports Linux, macOS, and Windows. Some features may have platform-specific implementations.
+
+### Error Handling
+
+The application uses `anyhow` for general error handling and propagation, with detailed error messages to help diagnose issues during benchmarking.
+
+### Future Improvements
+
+- Implement actual FFI bindings for llama.c
+- Add support for more LLM backends
+- Enhance GPU metrics collection
+- Add visualization tools for benchmark results
+- Support for running comparative benchmarks across different models or hardware
+
+## Sample Output
 
 ```
 Benchmark Results
@@ -199,110 +234,20 @@ Performance Metrics
 Avg. Model Load Time:     49 ms
 Avg. First Token Time:    4478 ms
 Avg. Token Time:          86.13 ms
-Avg. Total Gen. Time:     4479 ms
-Avg. Tokens Per Second:   11.62
+Avg. Total Gen. Time:     8756 ms
+Avg. Tokens Per Second:   11.61
 
 System Metrics (Avg)
-===================
-CPU Usage:                61.38%
-Memory Usage:             32.90 MB
-Peak Memory Usage:        33.68 MB
+====================
+CPU Usage:                78.5%
+Memory Usage:             3.42 GB
+Peak Memory Usage:        4.17 GB
 
-Model Output (Last Iteration)
-============================
+Generated Output
+===============
 function factorial(n) {
-    if (n === 0 || n === 1) {
-        return 1;
-    } else {
-        return n * factorial(n - 1);
-    }
+  if (n === 0 || n === 1) {
+    return 1;
+  }
+  return n * factorial(n - 1);
 }
-```
-
-## Implementation Details
-
-### Benchmarking Methodology
-
-The benchmark process follows these steps:
-
-1. **Initialization:** Parse command-line arguments and set up the environment.
-2. **Warm-up Phase:** Execute one or more warm-up iterations to prime the system (results discarded).
-3. **Benchmark Phase:** Execute the specified number of benchmark iterations.
-4. **Metrics Collection:** For each iteration:
-   - Measure model load time
-   - Measure first token generation time
-   - Measure per-token generation time
-   - Track total generation time and tokens per second
-   - Optionally collect system metrics (CPU, memory usage)
-5. **Results Aggregation:** Calculate averages across all iterations.
-6. **Output:** Display results in the specified format (table or JSON).
-
-### Benchmark Output Format
-
-After running a benchmark command, the CLI displays the following sections:
-
-#### 1. Process Information (from logs)
-- Initialization messages and parameter details (model path, mode, iterations, warmup count)
-- System information is logged (CPU model, number of cores) as soon as it's collected
-
-#### 2. Hardware Information
-- **CPU:** Model name and specifications
-- **CPU Cores:** Number of physical cores
-- **Memory:** Total system memory in GB
-- **OS:** Operating system name and version
-- **GPU:** GPU information (if available)
-
-#### 3. Model Information (when available)
-- **Name:** Model identifier
-- **Family:** Model architecture family
-- **Parameters:** Parameter count in billions
-- **Quantization:** Quantization level used
-- **Context Length:** Maximum context window size
-
-#### 4. Performance Metrics
-- **Avg. Model Load Time:** Time to load the model (ms)
-- **Avg. First Token Time:** Time to generate the first token (ms)
-- **Avg. Token Time:** Average time per token (ms)
-- **Avg. Total Gen. Time:** Total generation time (ms)
-- **Avg. Tokens Per Second:** Throughput in tokens per second
-
-#### 5. System Metrics (when enabled)
-- **CPU Usage:** Average CPU utilization (%)
-- **Memory Usage:** Average memory consumption (MB)
-- **Peak Memory Usage:** Maximum memory usage during execution (MB)
-- **GPU Usage:** GPU utilization (if available)
-
-#### 6. Model Output (Last Iteration)
-- Displays the actual model output from the last iteration, allowing for evaluation of both performance metrics and output quality.
-
-This comprehensive reporting makes it easier to diagnose performance bottlenecks, relate model throughput to hardware capabilities, and generate detailed reports for analysis or CI dashboards.
-
-### JSON Output
-
-When using the `--output json` flag, all the above information is provided in a structured JSON format, making it easy to parse and integrate with other tools or dashboards.
-
-## Future Enhancements
-
-The following features are planned for future releases:
-
-- **GPU Metrics:** Enhance GPU metrics collection for systems with CUDA or other GPU acceleration
-- **Historical Tracking:** Implement storage and visualization of benchmark results over time
-- **Model Comparison:** Add direct comparison between multiple models in a single run
-- **Batch Processing:** Support for batch inference benchmarking
-- **Export Formats:** Additional export formats beyond JSON (CSV, HTML reports)
-- **Web Dashboard:** A simple web interface for visualizing benchmark results
-
-## Contributing
-
-- Follow established coding standards.
-- Run tests locally before committing changes.
-- Submit pull requests to feature branches for review.
-- Engage in peer code reviews through the established workflow system.
-
-## License
-
-[MIT License]
-
-## Contact
-
-For questions, suggestions, or issues, please open an issue in the GitHub repository.
