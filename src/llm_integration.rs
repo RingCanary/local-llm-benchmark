@@ -45,6 +45,17 @@ pub struct ModelInfo {
     pub metadata: serde_json::Value,
 }
 
+/// Generation options for LLMs
+#[derive(Debug, Clone, Default)]
+pub struct GenerationOptions {
+    pub temperature: Option<f32>,
+    pub top_k: Option<i32>,
+    pub top_p: Option<f32>,
+    pub repeat_penalty: Option<f32>,
+    pub context_length: Option<usize>,
+    pub mirostat: Option<i32>,
+}
+
 /// Create an LLM model based on the specified backend
 pub fn create_llm_model(model_path: &Path, backend: LlmBackend) -> Result<Box<dyn LlmModel>> {
     match backend {
