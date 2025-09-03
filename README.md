@@ -2,37 +2,29 @@
 
 ## Overview
 
-This CLI application is designed to benchmark hardware performance for running local LLM inference tasks. Built in Rust for memory safety and speed, it will measure performance metrics such as latency, token throughput, and system resource usage while running LLM models. The tool is built to interface with local LLM libraries like [llama.cpp](https://github.com/ggml-org/llama.cpp), [llama.rs](https://github.com/dustletter/llama-rs), and [Ollama](https://ollama.com/), using an abstraction layer to support all options.
+This CLI application is designed to benchmark hardware performance for running local LLM inference tasks. Built in Rust for memory safety and speed, it measures performance metrics such as latency, token throughput, and system resource usage while running LLM models. The tool aims to interface with local LLM libraries like [llama.cpp](https://github.com/ggml-org/llama.cpp), [llama.rs](https://github.com/dustletter/llama-rs), and [Ollama](https://ollama.com/). At present only the Ollama backend is functional; the llama.cpp and llama.rs integrations are placeholders.
 
 ## Features
 
-- **Command-Line Interface:** Built using a robust CLI crate (Clap) to facilitate argument parsing.
-- **Benchmarking Suite:** Executes warm-up and timed benchmarking cycles to measure:
-  - Model load time
-  - Inference latency (per token and generation overall)
-  - Throughput (tokens per second)
-- **LLM Integration:** Supports multiple backends:
-  - llama.c (via FFI)
-  - llama.rs (pure Rust implementation)
-  - Ollama (for easy access to a wide range of models)
-- **Model Information:** Retrieves and displays detailed model information:
-  - Model family/architecture
-  - Parameter count
-  - Quantization level
-  - Context length
-- **Hardware Information:** Collects and displays detailed system specifications:
-  - CPU model and core count
-  - Total system memory
-  - Operating system details
-  - Disk information
-- **System Metrics:** Integrates system metrics collection during benchmarking:
-  - CPU usage
-  - Memory usage (average and peak)
-  - GPU usage (when available)
-- **Output Formats:** Results can be presented in human-friendly tables or machine-parsable JSON.
-- **Cross-Platform Compatibility:** Uses conditional compilation for platform-specific optimizations.
-- **Verbosity Levels:** Supports three verbosity levels for output control.
-- **LLM Output Display:** Displays the actual model output from the last iteration, allowing for evaluation of both performance metrics and output quality.
+### Implemented
+
+- **Command-Line Interface:** Robust argument parsing using Clap.
+- **Benchmarking Suite:** Warm-up and timed cycles that report model load time, inference latency and token throughput.
+- **LLM Integration:** Currently only the Ollama backend is operational.
+- **Model and Hardware Information:** Displays model metadata and detailed system specifications.
+- **System Metrics:** Collects CPU and memory usage during benchmarking.
+- **Output Formats:** Human-readable tables or machine-parsable JSON.
+- **Cross-Platform Compatibility:** Conditional compilation for platform-specific optimizations.
+- **Verbosity Levels:** Three levels of output control.
+- **LLM Output Display:** Shows the final iteration's generated text.
+- **Advanced Model Options:** CLI parses options like `--temperature`, `--top_k`, `--top_p`, `--repeat_penalty`, `--context_length`, and `--mirostat`, though they are not yet applied by the backend.
+
+### Future Work
+
+- Integrations for **llama.c** and **llama.rs** backends.
+- Unit and integration tests.
+- GPU usage reporting.
+- Additional LLM backends and benchmark visualizations.
 
 ## Project Architecture
 
@@ -48,10 +40,10 @@ Project Root
     ├── cli.rs              // CLI argument parsing (using Clap)
     ├── benchmark.rs        // Core benchmarking logic (timing, iterations, stats)
     ├── llm_integration.rs  // Abstraction for llama.c, llama.rs, and Ollama
-    ├── metrics.rs          // System metrics collection
-    └── tests/              // Unit tests
-└── tests/                  // Integration tests
+    └── metrics.rs          // System metrics collection
 ```
+
+*Test directories are planned but not yet implemented.*
 
 ### Module Responsibilities
 
@@ -67,10 +59,9 @@ Project Root
    - Format and display output.
 
 3. **LLM Integration Module (src/llm_integration.rs):**
-   - Abstract interactions with the supported LLM frameworks.
-   - Use Rust's FFI for llama.c (isolating unsafe code).
-   - Integrate directly with llama.rs functions.
-   - Connect to Ollama API for using models hosted by Ollama.
+   - Abstract interactions with multiple LLM frameworks.
+   - Currently connects to the Ollama API for using models hosted by Ollama.
+   - Planned: FFI for llama.c and direct integration with llama.rs.
    - Provide a unified API for loading models and generating results based on the selected backend.
 
 4. **System Metrics Module (src/metrics.rs):**
@@ -150,7 +141,7 @@ cargo run -- benchmark --model-path llama3.2:latest --mode ollama --iterations 3
 
 ### Model Options
 
-The benchmarking tool supports several model options that influence the behavior of the LLM during inference. These parameters are primarily for the Ollama backend and allow fine-tuning the generation process:
+The CLI parses several model options that influence LLM inference. These parameters are primarily intended for the Ollama backend and allow fine-tuning the generation process, but they are currently parsed only and not yet applied to generation:
 
 | Option | Description | Range | Default |
 |--------|-------------|-------|---------|
@@ -168,6 +159,8 @@ cargo run -- benchmark --model-path llama3.2:latest --mode ollama --iterations 3
   --temperature 0.7 --top_k 50 --top_p 0.95 --repeat_penalty 1.3 --context_length 2048 --mirostat 1 \
   --prompt "Explain the concept of recursion in programming"
 ```
+
+*These options are currently placeholders and do not yet affect model generation.*
 
 ### Logging
 
