@@ -150,6 +150,10 @@ pub fn execute_command(args: &CliArgs) -> Result<()> {
                     println!("Using Ollama model: {}", info_args.model_path.display());
                     println!("Note: Actual model parameters depend on the specific model loaded in Ollama");
                 }
+                LlmBackend::LmStudio => {
+                    println!("Using LM Studio model: {}", info_args.model_path.display());
+                    println!("Note: Actual model parameters depend on the specific model loaded in LM Studio");
+                }
             }
             
             Ok(())

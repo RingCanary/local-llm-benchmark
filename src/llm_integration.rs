@@ -18,13 +18,271 @@ pub enum LlmBackend {
     LlamaRs,
     /// Use Ollama API
     Ollama,
+    /// Use LM Studio API
+    LmStudio,
 }
 
 /// Trait for LLM models
 pub trait LlmModel {
     fn generate(&mut self, prompt: &str, max_tokens: usize, callback: TokenCallback) -> Result<()>;
-    fn get_model_info(&self) -> Result<Option<ModelInfo>> {
+    fn get_model_info(&mut self) -> Result<Option<ModelInfo>> {
         Ok(None)
+    }
+}
+
+/// Request structure for LM Studio API (OpenAI compatible)
+#[derive(Serialize)]
+struct LmStudioRequest {
+    model: String,
+    prompt: String,
+    stream: bool,
+    options: Option<OllamaOptions>,
+}
+
+/// Response structure from LM Studio API (OpenAI compatible)
+#[derive(Debug, Clone, Deserialize)]
+struct LmStudioStreamResponse {
+    choices: Vec<LmStudioStreamChoice>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct LmStudioStreamChoice {
+    delta: LmStudioStreamDelta,
+    finish_reason: Option<String>,
+}
+
+#[derive(Debug, Clone, Deserialize)]
+struct LmStudioStreamDelta {
+    content: Option<String>,
+}
+
+/// LM Studio model info response
+#[derive(Deserialize, Debug, Clone, Serialize)]
+struct LmStudioModelInfo {
+    id: String,
+    object: String,
+    created: u64,
+    owned_by: String,
+}
+
+#[derive(Deserialize, Debug, Clone)]
+struct LmStudioModelList {
+    data: Vec<LmStudioModelInfo>,
+}
+
+/// Implementation for LM Studio API
+pub struct LmStudioModel {
+    model_name: String,
+    client: Client,
+    model_info: Option<ModelInfo>,
+    base_url: String,
+}
+
+impl LmStudioModel {
+    pub fn new(model_path: &Path) -> Result<Self> {
+        Self::new_with_base_url(model_path, "http://localhost:1234/v1")
+    }
+
+    pub fn new_with_base_url(model_path: &Path, base_url: &str) -> Result<Self> {
+        // For LM Studio, the "path" is actually the model name
+        let model_name = model_path.file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("unknown")
+            .to_string();
+
+        debug!("Using LM Studio model: {}", model_name);
+
+        // Create HTTP client with reasonable timeout
+        let client = Client::builder()
+            .timeout(Duration::from_secs(60))
+            .build()
+            .context("Failed to create HTTP client")?;
+
+        let mut model = LmStudioModel {
+            model_name,
+            client,
+            model_info: None,
+            base_url: base_url.to_string(),
+        };
+
+        // Try to fetch model info
+        if let Ok(Some(info)) = model.get_model_info() {
+            model.model_info = Some(info);
+        }
+
+        Ok(model)
+    }
+
+    fn fetch_model_info(&self) -> Result<LmStudioModelInfo> {
+        let url = format!("{}/models", self.base_url);
+
+        let response = self.client.get(&url)
+            .send()
+            .context("Failed to send request to LM Studio API for model info")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            error!("LM Studio API error: {} - {}", status, error_text);
+            return Err(anyhow::anyhow!("LM Studio API error: {} - {}", status, error_text));
+        }
+
+        let model_list: LmStudioModelList = response.json()
+            .context("Failed to parse LM Studio model list response")?;
+
+        model_list.data.into_iter()
+            .find(|m| m.id == self.model_name)
+            .context(format!("Model '{}' not found in LM Studio", self.model_name))
+    }
+}
+
+impl LlmModel for LmStudioModel {
+    fn generate(&mut self, prompt: &str, max_tokens: usize, mut callback: TokenCallback) -> Result<()> {
+        debug!("Generating with LM Studio model: {}, prompt: {}, max_tokens: {}",
+               self.model_name, prompt, max_tokens);
+
+        // Prepare request to LM Studio API (OpenAI compatible)
+        let request = serde_json::json!({
+            "model": self.model_name,
+            "messages": [{"role": "user", "content": prompt}],
+            "max_tokens": max_tokens,
+            "stream": true,
+        });
+
+        // Make API request to LM Studio
+        let url = format!("{}/chat/completions", self.base_url);
+
+        let response = self.client.post(url)
+            .json(&request)
+            .send()
+            .context("Failed to send request to LM Studio API")?;
+
+        if !response.status().is_success() {
+            let status = response.status();
+            let error_text = response.text().unwrap_or_else(|_| "Unknown error".to_string());
+            error!("LM Studio API error: {} - {}", status, error_text);
+            return Err(anyhow::anyhow!("LM Studio API error: {} - {}", status, error_text));
+        }
+
+        // Process streaming response
+        let mut is_first = true;
+        for line in response.text()?.lines() {
+            if line.starts_with("data: ") {
+                let json_str = &line[6..];
+                if json_str == "[DONE]" {
+                    break;
+                }
+
+                let lm_studio_response: LmStudioStreamResponse = match serde_json::from_str(json_str) {
+                    Ok(res) => res,
+                    Err(e) => {
+                        debug!("Failed to parse LM Studio API response chunk: {}", e);
+                        continue;
+                    }
+                };
+
+                if let Some(choice) = lm_studio_response.choices.get(0) {
+                    if let Some(content) = &choice.delta.content {
+                        if !callback(content.clone(), is_first) {
+                            break;
+                        }
+                        is_first = false;
+                    }
+                    if choice.finish_reason.is_some() {
+                        break;
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+
+    fn get_model_info(&mut self) -> Result<Option<ModelInfo>> {
+        // If we already have model info, return it
+        if let Some(ref info) = self.model_info {
+            return Ok(Some(info.clone()));
+        }
+
+        // Otherwise, try to fetch it
+        match self.fetch_model_info() {
+            Ok(lm_studio_info) => {
+                let model_info = ModelInfo {
+                    name: lm_studio_info.id.clone(),
+                    family: None,
+                    parameter_count: None,
+                    quantization: None,
+                    context_length: None,
+                    metadata: serde_json::to_value(lm_studio_info).unwrap_or_default(),
+                };
+
+                self.model_info = Some(model_info.clone());
+                Ok(Some(model_info))
+            },
+            Err(e) => {
+                debug!("Failed to fetch model info from LM Studio: {}", e);
+                Ok(None)
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+    use mockito::Server;
+
+    #[test]
+    fn test_lm_studio_get_model_info() {
+        let mut server = Server::new();
+        let model_name = "test-model";
+        let base_url = server.url();
+
+        let _m = server.mock("GET", "/models")
+            .with_status(200)
+            .with_header("content-type", "application/json")
+            .with_body(format!(r#"{{"data": [{{"id": "{}","object": "model","created": 1234567890,"owned_by": "test-owner"}}]}}"#, model_name))
+            .create();
+
+        let model_path = PathBuf::from(model_name);
+        let mut model = LmStudioModel::new_with_base_url(&model_path, &base_url).unwrap();
+
+        let model_info = model.get_model_info().unwrap().unwrap();
+
+        assert_eq!(model_info.name, model_name);
+        assert!(model_info.metadata.get("owned_by").is_some());
+    }
+
+    #[test]
+    fn test_lm_studio_generate() {
+        use std::rc::Rc;
+        use std::cell::RefCell;
+        let mut server = Server::new();
+        let model_name = "test-model";
+        let base_url = server.url();
+
+        let stream_body = "data: {\"choices\":[{\"delta\":{\"content\":\"hello\"}}]}\n\ndata: {\"choices\":[{\"delta\":{\"content\":\" world\"}}]}\n\ndata: [DONE]\n\n";
+
+        let _m = server.mock("POST", "/chat/completions")
+            .with_status(200)
+            .with_body(stream_body)
+            .create();
+
+        let model_path = PathBuf::from(model_name);
+        let mut model = LmStudioModel::new_with_base_url(&model_path, &base_url).unwrap();
+
+        let tokens = Rc::new(RefCell::new(Vec::new()));
+        let tokens_clone = tokens.clone();
+
+        let callback = Box::new(move |token: String, _is_first: bool| {
+            tokens_clone.borrow_mut().push(token);
+            true
+        });
+
+        model.generate("test prompt", 10, callback).unwrap();
+
+        assert_eq!(*tokens.borrow(), vec!["hello", " world"]);
     }
 }
 
@@ -70,6 +328,10 @@ pub fn create_llm_model(model_path: &Path, backend: LlmBackend) -> Result<Box<dy
         LlmBackend::Ollama => {
             info!("Creating Ollama model from {}", model_path.display());
             Ok(Box::new(OllamaModel::new(model_path)?))
+        }
+        LlmBackend::LmStudio => {
+            info!("Creating LM Studio model from {}", model_path.display());
+            Ok(Box::new(LmStudioModel::new(model_path)?))
         }
     }
 }
@@ -353,7 +615,7 @@ impl LlmModel for OllamaModel {
         Ok(())
     }
     
-    fn get_model_info(&self) -> Result<Option<ModelInfo>> {
+    fn get_model_info(&mut self) -> Result<Option<ModelInfo>> {
         // If we already have model info, return it
         if let Some(ref info) = self.model_info {
             return Ok(Some(info.clone()));
@@ -372,14 +634,15 @@ impl LlmModel for OllamaModel {
                 let details_json = serde_json::to_value(ollama_info.details.clone()).unwrap_or_default();
                 
                 let model_info = ModelInfo {
-                    name: ollama_info.model,
-                    family: Some(ollama_info.details.family),
+                    name: ollama_info.model.clone(),
+                    family: Some(ollama_info.details.family.clone()),
                     parameter_count,
-                    quantization: ollama_info.details.quantization_level,
+                    quantization: ollama_info.details.quantization_level.clone(),
                     context_length: Some(ollama_info.details.context_length),
                     metadata: details_json,
                 };
                 
+                self.model_info = Some(model_info.clone());
                 Ok(Some(model_info))
             },
             Err(e) => {
