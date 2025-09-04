@@ -2,7 +2,7 @@
 
 ## Overview
 
-This CLI application is designed to benchmark hardware performance for running local LLM inference tasks. Built in Rust for memory safety and speed, it measures performance metrics such as latency, token throughput, and system resource usage while running LLM models. The tool aims to interface with local LLM libraries like [llama.cpp](https://github.com/ggml-org/llama.cpp), [llama.rs](https://github.com/dustletter/llama-rs), and [Ollama](https://ollama.com/). At present only the Ollama backend is functional; the llama.cpp and llama.rs integrations are placeholders.
+This CLI application is designed to benchmark hardware performance for running local LLM inference tasks. Built in Rust for memory safety and speed, it measures performance metrics such as latency, token throughput, and system resource usage while running LLM models. The tool aims to interface with local LLM libraries and servers like [llama.cpp](https://github.com/ggml-org/llama.cpp), [llama.rs](https://github.com/dustletter/llama-rs), [Ollama](https://ollama.com/), and [LM Studio](https://lmstudio.ai/). At present the Ollama and LM Studio backends are functional; the llama.cpp and llama.rs integrations are placeholders.
 
 ## Features
 
@@ -10,7 +10,7 @@ This CLI application is designed to benchmark hardware performance for running l
 
 - **Command-Line Interface:** Robust argument parsing using Clap.
 - **Benchmarking Suite:** Warm-up and timed cycles that report model load time, inference latency and token throughput.
-- **LLM Integration:** Currently only the Ollama backend is operational.
+- **LLM Integration:** Operational backends for Ollama and LM Studio.
 - **Model and Hardware Information:** Displays model metadata and detailed system specifications.
 - **System Metrics:** Collects CPU and memory usage during benchmarking.
 - **Output Formats:** Human-readable tables or machine-parsable JSON.
@@ -98,7 +98,11 @@ The project relies on several key Rust crates:
 
    If you want to use the Ollama backend, install Ollama from [ollama.ai](https://ollama.ai/).
 
-4. **Build the Project:**
+4. **Install LM Studio (Optional):**
+
+   If you want to use the LM Studio backend, install it from [lmstudio.ai](https://lmstudio.ai/).
+
+5. **Build the Project:**
 
    Build in release mode for performance-critical benchmarking:
 
@@ -118,11 +122,14 @@ The project relies on several key Rust crates:
 
 ### Basic Benchmarking
 
-*please note llama3.2:latest, gemma3, etc, are just the placeholders for the model path, replace it with the actual model path*
+*please note that for Ollama and LM Studio, the model path should be the model identifier used by the respective service.*
 
 ```bash
 # Benchmark a model using Ollama
 cargo run -- benchmark --model-path llama3.2:latest --mode ollama --iterations 3 --warmup 1 --prompt "Write a function to calculate the factorial of a number"
+
+# Benchmark a model using LM Studio
+cargo run -- benchmark --model-path <your-model-id> --mode lm-studio --iterations 3 --warmup 1 --prompt "Write a short story about a robot who discovers music."
 
 # Benchmark with system metrics collection
 cargo run -- benchmark --model-path opencoder:1.5b --mode ollama --iterations 3 --warmup 1 --system-metrics --prompt "Solve ∫x sin(x) dx from 0 to π with detailed steps"

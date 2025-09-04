@@ -22,3 +22,6 @@ thiserror = "2.0.12"
 [features]
 default = []
 llama-rs = ["dep:llm"]
+
+[dev-dependencies]
+mockito = "1.0.0"
