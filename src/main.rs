@@ -1,26 +1,26 @@
-mod cli;
 mod benchmark;
+mod cli;
 mod llm_integration;
 mod metrics;
 
 use anyhow::Result;
-use log::info;
-use fern;
 use chrono::Local;
+use fern;
+use log::info;
 use std::str::FromStr;
 
 fn main() -> Result<()> {
     // Parse command line arguments
     let args = cli::parse_args()?;
-    
+
     // Initialize logger using fern instead of env_logger
     setup_logger(&args.log_level).expect("Failed to initialize logger");
 
     info!("Starting LLM Hardware Benchmarker");
-    
+
     // Execute the command
     cli::execute_command(&args)?;
-    
+
     info!("Finished successfully");
     Ok(())
 }
