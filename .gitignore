@@ -18,8 +18,5 @@ target/
 
 # Added by cargo
 
-/target
-
 # log files
 output.log
-

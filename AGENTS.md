@@ -4,7 +4,7 @@
 Local Rust CLI for benchmarking local LLM inference performance (latency, throughput, optional system metrics) across backends.
 
 ## Stack
-- Rust 2021 + Cargo
+- Rust 2024 + Cargo
 - clap (CLI), indicatif/colored (console UX)
 - serde/serde_json (JSON), fern/log/chrono (logging)
 - sysinfo (system metrics), reqwest blocking (local HTTP API calls)

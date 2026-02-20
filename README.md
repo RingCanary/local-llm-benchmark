@@ -2,7 +2,7 @@
 
 ## Overview
 
-This CLI application is designed to benchmark hardware performance for running local LLM inference tasks. Built in Rust for memory safety and speed, it measures performance metrics such as latency, token throughput, and system resource usage while running LLM models. The tool aims to interface with local LLM libraries like [llama.cpp](https://github.com/ggml-org/llama.cpp), [llama.rs](https://github.com/dustletter/llama-rs), and [Ollama](https://ollama.com/). At present only the Ollama backend is functional; the llama.cpp and llama.rs integrations are placeholders.
+This CLI application is designed to benchmark hardware performance for running local LLM inference tasks. Built in Rust for memory safety and speed, it measures performance metrics such as latency, token throughput, and system resource usage while running LLM models. The tool interfaces with local backends like [Ollama](https://ollama.com/) and LM Studio (OpenAI-compatible API), and includes placeholder paths for [llama.cpp](https://github.com/ggml-org/llama.cpp) and [llama.rs](https://github.com/dustletter/llama-rs).
 
 ## Features
 
@@ -10,7 +10,7 @@ This CLI application is designed to benchmark hardware performance for running l
 
 - **Command-Line Interface:** Robust argument parsing using Clap.
 - **Benchmarking Suite:** Warm-up and timed cycles that report model load time, inference latency and token throughput.
-- **LLM Integration:** Currently only the Ollama backend is operational.
+- **LLM Integration:** Ollama and LM Studio backends are available today.
 - **Model and Hardware Information:** Displays model metadata and detailed system specifications.
 - **System Metrics:** Collects CPU and memory usage during benchmarking.
 - **Output Formats:** Human-readable tables or machine-parsable JSON.
@@ -21,7 +21,7 @@ This CLI application is designed to benchmark hardware performance for running l
 
 ### Future Work
 
-- Integrations for **llama.c** and **llama.rs** backends.
+- Production-ready integrations for **llama.c** and **llama.rs** backends.
 - Unit and integration tests.
 - GPU usage reporting.
 - Additional LLM backends and benchmark visualizations.
@@ -39,7 +39,7 @@ Project Root
     ├── main.rs             // Entry point: sets up CLI and logging
     ├── cli.rs              // CLI argument parsing (using Clap)
     ├── benchmark.rs        // Core benchmarking logic (timing, iterations, stats)
-    ├── llm_integration.rs  // Abstraction for llama.c, llama.rs, and Ollama
+    ├── llm_integration.rs  // Abstraction for llama.c, llama.rs, Ollama, and LM Studio
     └── metrics.rs          // System metrics collection
 ```
 
@@ -60,7 +60,7 @@ Project Root
 
 3. **LLM Integration Module (src/llm_integration.rs):**
    - Abstract interactions with multiple LLM frameworks.
-   - Currently connects to the Ollama API for using models hosted by Ollama.
+   - Connects to Ollama and LM Studio APIs for local model serving.
    - Planned: FFI for llama.c and direct integration with llama.rs.
    - Provide a unified API for loading models and generating results based on the selected backend.
 
@@ -79,7 +79,7 @@ The project relies on several key Rust crates:
 - **log/fern**: Logging infrastructure
 - **colored**: Terminal coloring for improved readability
 - **indicatif**: Progress bars for benchmarking
-- **reqwest**: HTTP client for Ollama API integration
+- **reqwest**: HTTP client for local API integration (Ollama/LM Studio)
 
 ## Getting Started
 
@@ -92,11 +92,11 @@ The project relies on several key Rust crates:
 
 2. **Install Rust:**
 
-   Ensure you have Rust and Cargo installed – visit [rustup.rs](https://rustup.rs) if needed.
+   Ensure you have Rust and Cargo installed (Rust 1.85+ recommended for Edition 2024 support) - visit [rustup.rs](https://rustup.rs) if needed.
 
-3. **Install Ollama (Optional):**
+3. **Install a Local Backend (Optional):**
 
-   If you want to use the Ollama backend, install Ollama from [ollama.ai](https://ollama.ai/).
+   If you want real local inference (instead of simulated `llama-c` mode), install Ollama from [ollama.ai](https://ollama.ai/) or run LM Studio with its local API enabled.
 
 4. **Build the Project:**
 
@@ -114,7 +114,23 @@ The project relies on several key Rust crates:
    cargo run -- --help
    ```
 
+## Changelog
+
+See `CHANGELOG.md` for tracked project changes.
+
 ## Usage Examples
+
+### Local Validation Without Ollama or LM Studio
+
+Use these commands to validate the project in environments where local backend apps are not running:
+
+```bash
+cargo fmt --all -- --check
+cargo check
+
+# Optional: simulated backend run (no local API needed)
+cargo run -- benchmark --model-path dummy-model --mode llama-c --warmup 0 --iterations 1 --verbosity 0 --output json --prompt "ping"
+```
 
 ### Basic Benchmarking
 
