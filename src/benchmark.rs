@@ -8,7 +8,7 @@ use std::rc::Rc;
 use std::time::{Duration, Instant};
 
 use crate::cli::{BenchmarkArgs, OutputFormat};
-use crate::llm_integration::{ModelInfo, create_llm_model};
+use crate::llm_integration::{GenerationOptions, ModelInfo, create_llm_model};
 use crate::metrics::{HardwareInfo, SystemMetrics, SystemMetricsCollector, get_hardware_info};
 
 /// Represents a single benchmark result
@@ -490,6 +490,16 @@ fn run_single_benchmark(args: &BenchmarkArgs, collect_metrics: bool) -> Result<B
         collector.start();
     }
 
+    // Build generation options from CLI args (safe conversion)
+    let gen_options = GenerationOptions {
+        temperature: Some(args.temperature),
+        top_k: Some(args.top_k),
+        top_p: Some(args.top_p),
+        repeat_penalty: Some(args.repeat_penalty),
+        context_length: usize::try_from(args.context_length).ok(),
+        mirostat: Some(args.mirostat),
+    };
+
     // Generate tokens and measure time
     let generation_start = Instant::now();
 
@@ -500,13 +510,13 @@ fn run_single_benchmark(args: &BenchmarkArgs, collect_metrics: bool) -> Result<B
         generated_text: String,
     }
 
-    let stats = TokenStats {
+    let token_stats = TokenStats {
         first_token_time: None,
         tokens_generated: 0,
         generated_text: String::new(),
     };
 
-    let stats_ref = Rc::new(RefCell::new(stats));
+    let stats_ref = Rc::new(RefCell::new(token_stats));
     let stats_clone = stats_ref.clone();
 
     // Create a non-moving closure for token generation
@@ -521,9 +531,14 @@ fn run_single_benchmark(args: &BenchmarkArgs, collect_metrics: bool) -> Result<B
         true // continue generation
     });
 
-    // Run the generation
-    model
-        .generate(&args.prompt, args.max_tokens as usize, callback)
+    // Run the generation with options and capture backend stats
+    let backend_stats = model
+        .generate(
+            &args.prompt,
+            args.max_tokens as usize,
+            &gen_options,
+            callback,
+        )
         .context("Failed to generate tokens")?;
 
     let generation_time = generation_start.elapsed();
@@ -536,10 +551,12 @@ fn run_single_benchmark(args: &BenchmarkArgs, collect_metrics: bool) -> Result<B
     };
 
     // Calculate statistics
-    let stats = stats_ref.borrow();
-    let first_token_time = stats.first_token_time.unwrap_or_else(|| generation_time);
-    let tokens_generated = stats.tokens_generated;
-    let generated_text = stats.generated_text.clone();
+    let token_stats = stats_ref.borrow();
+    let first_token_time = token_stats
+        .first_token_time
+        .unwrap_or_else(|| generation_time);
+    let tokens_generated = token_stats.tokens_generated;
+    let generated_text = token_stats.generated_text.clone();
 
     let avg_token_time = if tokens_generated > 0 {
         generation_time.as_millis() as f64 / tokens_generated as f64
@@ -547,7 +564,10 @@ fn run_single_benchmark(args: &BenchmarkArgs, collect_metrics: bool) -> Result<B
         0.0
     };
 
-    let tokens_per_second = if generation_time.as_secs_f64() > 0.0 {
+    // Use backend tokens per second when available, otherwise fall back to wall-clock
+    let tokens_per_second = if let Some(backend_tps) = backend_stats.backend_tokens_per_second {
+        backend_tps
+    } else if generation_time.as_secs_f64() > 0.0 {
         tokens_generated as f64 / generation_time.as_secs_f64()
     } else {
         0.0
@@ -556,11 +576,17 @@ fn run_single_benchmark(args: &BenchmarkArgs, collect_metrics: bool) -> Result<B
     // Calculate additional metrics
     let total_duration = model_load_time + generation_time;
 
-    // For now, use default values for these metrics as the LLM interface doesn't provide them
-    let prompt_eval_duration = Duration::from_millis(0);
-    let eval_duration = Duration::from_millis(0);
-    let prompt_eval_count = 0;
-    let eval_count = 0;
+    // Use backend stats for timing when available
+    let prompt_eval_duration = backend_stats
+        .prompt_eval_duration_ns
+        .map(|ns| Duration::from_nanos(ns))
+        .unwrap_or_else(|| Duration::from_millis(0));
+    let eval_duration = backend_stats
+        .eval_duration_ns
+        .map(|ns| Duration::from_nanos(ns))
+        .unwrap_or_else(|| Duration::from_millis(0));
+    let prompt_eval_count = backend_stats.prompt_eval_count.unwrap_or(0);
+    let eval_count = backend_stats.eval_count.unwrap_or(0);
 
     Ok(BenchmarkResult {
         model_load_time_ms: model_load_time.as_millis() as u64,

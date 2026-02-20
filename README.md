@@ -10,14 +10,14 @@ This CLI application is designed to benchmark hardware performance for running l
 
 - **Command-Line Interface:** Robust argument parsing using Clap.
 - **Benchmarking Suite:** Warm-up and timed cycles that report model load time, inference latency and token throughput.
-- **LLM Integration:** Ollama and LM Studio backends are available today.
+- **LLM Integration:** Ollama, LM Studio, and llama-server backends are available today.
 - **Model and Hardware Information:** Displays model metadata and detailed system specifications.
 - **System Metrics:** Collects CPU and memory usage during benchmarking.
 - **Output Formats:** Human-readable tables or machine-parsable JSON.
 - **Cross-Platform Compatibility:** Conditional compilation for platform-specific optimizations.
 - **Verbosity Levels:** Three levels of output control.
 - **LLM Output Display:** Shows the final iteration's generated text.
-- **Advanced Model Options:** CLI parses options like `--temperature`, `--top_k`, `--top_p`, `--repeat_penalty`, `--context_length`, and `--mirostat`, though they are not yet applied by the backend.
+- **Advanced Model Options:** CLI options like `--temperature`, `--top_k`, `--top_p`, `--repeat_penalty`, `--context_length`, and `--mirostat` are now applied to Ollama, LM Studio, and llama-server backends.
 
 ### Future Work
 
@@ -59,10 +59,10 @@ Project Root
    - Format and display output.
 
 3. **LLM Integration Module (src/llm_integration.rs):**
-   - Abstract interactions with multiple LLM frameworks.
-   - Connects to Ollama and LM Studio APIs for local model serving.
-   - Planned: FFI for llama.c and direct integration with llama.rs.
-   - Provide a unified API for loading models and generating results based on the selected backend.
+    - Abstract interactions with multiple LLM frameworks.
+    - Connects to Ollama, LM Studio, and llama-server APIs for local model serving.
+    - Planned: FFI for llama.c and direct integration with llama.rs.
+    - Provide a unified API for loading models and generating results based on the selected backend.
 
 4. **System Metrics Module (src/metrics.rs):**
    - Collect system-level metrics (CPU, memory, GPU if applicable) via the sysinfo crate.
@@ -96,7 +96,7 @@ The project relies on several key Rust crates:
 
 3. **Install a Local Backend (Optional):**
 
-   If you want real local inference (instead of simulated `llama-c` mode), install Ollama from [ollama.ai](https://ollama.ai/) or run LM Studio with its local API enabled.
+    If you want real local inference (instead of simulated `llama-c` mode), install Ollama from [ollama.ai](https://ollama.ai/), run LM Studio with its local API enabled, or start llama-server (`llama-server -m model.gguf --port 8080`).
 
 4. **Build the Project:**
 
@@ -140,6 +140,9 @@ cargo run -- benchmark --model-path dummy-model --mode llama-c --warmup 0 --iter
 # Benchmark a model using Ollama
 cargo run -- benchmark --model-path llama3.2:latest --mode ollama --iterations 3 --warmup 1 --prompt "Write a function to calculate the factorial of a number"
 
+# Benchmark using llama-server (default endpoint: http://localhost:8080/v1)
+cargo run -- benchmark --model-path local-model --mode llama-server --iterations 3 --warmup 1 --prompt "Explain quantum computing"
+
 # Benchmark with system metrics collection
 cargo run -- benchmark --model-path opencoder:1.5b --mode ollama --iterations 3 --warmup 1 --system-metrics --prompt "Solve ∫x sin(x) dx from 0 to π with detailed steps"
 
@@ -157,7 +160,7 @@ cargo run -- benchmark --model-path llama3.2:latest --mode ollama --iterations 3
 
 ### Model Options
 
-The CLI parses several model options that influence LLM inference. These parameters are primarily intended for the Ollama backend and allow fine-tuning the generation process, but they are currently parsed only and not yet applied to generation:
+The CLI supports several model options that influence LLM inference. These parameters are applied to Ollama, LM Studio, and llama-server backends:
 
 | Option | Description | Range | Default |
 |--------|-------------|-------|---------|
@@ -175,8 +178,6 @@ cargo run -- benchmark --model-path llama3.2:latest --mode ollama --iterations 3
   --temperature 0.7 --top_k 50 --top_p 0.95 --repeat_penalty 1.3 --context_length 2048 --mirostat 1 \
   --prompt "Explain the concept of recursion in programming"
 ```
-
-*These options are currently placeholders and do not yet affect model generation.*
 
 ### Logging
 

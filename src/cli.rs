@@ -161,6 +161,16 @@ pub fn execute_command(args: &CliArgs) -> Result<()> {
                         "Note: Actual model parameters depend on the specific model loaded in LM Studio"
                     );
                 }
+                LlmBackend::LlamaServer => {
+                    println!(
+                        "Using llama-server model: {}",
+                        info_args.model_path.display()
+                    );
+                    println!("Endpoint: http://localhost:8080/v1");
+                    println!(
+                        "Note: Actual model parameters depend on the model served by llama-server"
+                    );
+                }
             }
 
             Ok(())
